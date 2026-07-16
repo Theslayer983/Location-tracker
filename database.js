@@ -16,7 +16,7 @@ db.serialize(() => {
         )
     `);
 
-    // Visitors table
+    // Visitors table with address field
     db.run(`
         CREATE TABLE IF NOT EXISTS visitors (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,6 +25,7 @@ db.serialize(() => {
             location_lat REAL,
             location_lon REAL,
             location_accuracy REAL,
+            location_address TEXT,
             ip TEXT,
             device_platform TEXT,
             device_language TEXT,
