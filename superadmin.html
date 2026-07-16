@@ -32,6 +32,12 @@
             border-radius: 15px;
             max-width: 400px;
             margin: 50px auto;
+            border: 1px solid #0f3460;
+        }
+        .login-box h2 { 
+            margin-bottom: 20px; 
+            color: #e94560;
+            text-align: center;
         }
         .login-box input {
             width: 100%;
@@ -44,6 +50,10 @@
             font-size: 14px;
         }
         .login-box input::placeholder { color: #888; }
+        .login-box input:focus {
+            outline: 2px solid #e94560;
+            background: #1a1a3e;
+        }
         .login-box button {
             width: 100%;
             padding: 12px;
@@ -54,8 +64,21 @@
             font-size: 16px;
             cursor: pointer;
             transition: all 0.3s;
+            margin-top: 10px;
         }
-        .login-box button:hover { background: #c73e54; transform: translateY(-2px); }
+        .login-box button:hover { 
+            background: #c73e54; 
+            transform: translateY(-2px);
+        }
+        .login-box .hint {
+            text-align: center;
+            color: #888;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+        .login-box .hint span {
+            color: #e94560;
+        }
         .dashboard { display: none; }
         .stats {
             display: grid;
@@ -70,7 +93,12 @@
             text-align: center;
         }
         .stat-card h3 { color: #888; font-size: 14px; }
-        .stat-card .number { font-size: 36px; font-weight: bold; color: #e94560; margin-top: 10px; }
+        .stat-card .number { 
+            font-size: 36px; 
+            font-weight: bold; 
+            color: #e94560; 
+            margin-top: 10px; 
+        }
         .admin-card {
             background: #16213e;
             padding: 20px;
@@ -104,14 +132,32 @@
         .visitor-entry .visitor-time { color: #888; font-size: 12px; }
         .visitor-entry .visitor-details {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 10px;
         }
         .visitor-entry .label { color: #888; font-size: 12px; }
-        .visitor-entry .value { font-size: 14px; margin-top: 3px; }
+        .visitor-entry .value { font-size: 14px; margin-top: 3px; color: #fff; }
+        .visitor-entry .address { font-size: 13px; color: #aaccff; }
         .empty-state { text-align: center; padding: 40px; color: #888; }
-        #message { margin-top: 15px; padding: 10px; border-radius: 8px; display: none; }
+        #message { 
+            margin-top: 15px; 
+            padding: 10px; 
+            border-radius: 8px; 
+            display: none; 
+            text-align: center;
+        }
         .back-link { color: #e94560; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .warning {
+            background: #ffd70020;
+            border: 1px solid #ffd70040;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            color: #ffd700;
+            font-size: 12px;
+            text-align: center;
+        }
         @media (max-width: 768px) {
             .header { flex-direction: column; gap: 10px; text-align: center; }
             .stats { grid-template-columns: 1fr; }
@@ -126,11 +172,13 @@
         </div>
 
         <div id="loginBox" class="login-box">
-            <h2 style="margin-bottom:20px;">Super Admin Login</h2>
-            <input type="text" id="saUsername" placeholder="Username" value="superadmin" />
-            <input type="password" id="saPassword" placeholder="Password" value="enterpassword" />
+            <h2>🔐 Super Admin Login</h2>
+            <input type="text" id="saUsername" placeholder="Username" />
+            <input type="password" id="saPassword" placeholder="Enter Super Admin Password" />
             <button onclick="superLogin()">🔐 Login</button>
             <div id="message"></div>
+            <div class="hint">Default: <span>superadmin</span> / <span>slayer2026</span></div>
+            <div class="warning">⚠️ Change default password after first login!</div>
         </div>
 
         <div id="dashboard" class="dashboard">
@@ -152,9 +200,21 @@
             loadSuperData();
         }
 
+        document.getElementById('saPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') { superLogin(); }
+        });
+        document.getElementById('saUsername').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') { superLogin(); }
+        });
+
         async function superLogin() {
             const username = document.getElementById('saUsername').value.trim();
             const password = document.getElementById('saPassword').value.trim();
+
+            if (!username || !password) {
+                showMessage('❌ Please enter username and password', true);
+                return;
+            }
 
             try {
                 const res = await fetch('/api/superadmin/login', {
@@ -173,7 +233,7 @@
                     showMessage('❌ Invalid credentials', true);
                 }
             } catch (e) {
-                showMessage('❌ Network error', true);
+                showMessage('❌ Network error. Is server running?', true);
             }
         }
 
@@ -181,9 +241,15 @@
             const msg = document.getElementById('message');
             msg.textContent = text;
             msg.style.display = 'block';
-            msg.style.background = isError ? '#c73e54' : '#2e7d32';
+            msg.style.background = isError ? '#c73e5420' : '#2e7d3220';
+            msg.style.color = isError ? '#ff6b6b' : '#69db7c';
+            msg.style.border = isError ? '1px solid #c73e54' : '1px solid #2e7d32';
             msg.style.padding = '10px';
             msg.style.borderRadius = '8px';
+            
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 5000);
         }
 
         async function loadSuperData() {
@@ -230,12 +296,13 @@
                     return `
                         <div class="admin-card">
                             <div class="admin-header">
-                                <span class="admin-name">${admin.username}</span>
+                                <span class="admin-name">👤 ${admin.username}</span>
                                 <span class="admin-stats">👥 ${admin.totalVisitors} visitors | 🆔 ${admin.trackingId}</span>
                             </div>
                             ${admin.visitors && admin.visitors.length > 0 ? admin.visitors.map((v, i) => {
                                 const loc = v.location || {};
                                 const dev = v.device || {};
+                                const address = loc.address || 'Unknown';
                                 return `
                                     <div class="visitor-entry">
                                         <div class="visitor-header">
@@ -243,7 +310,8 @@
                                             <span class="visitor-time">${new Date(v.timestamp).toLocaleString()}</span>
                                         </div>
                                         <div class="visitor-details">
-                                            <div><div class="label">📍 Location</div><div class="value">${loc.lat ? loc.lat.toFixed(4)+', '+loc.lon.toFixed(4) : 'Unknown'}</div></div>
+                                            <div><div class="label">📍 Address</div><div class="value address">${address}</div></div>
+                                            <div><div class="label">🌐 Coordinates</div><div class="value">${loc.lat ? loc.lat.toFixed(4)+', '+loc.lon.toFixed(4) : 'Unknown'}</div></div>
                                             <div><div class="label">🌐 IP</div><div class="value">${v.ip || 'Unknown'}</div></div>
                                             <div><div class="label">📱 Device</div><div class="value">${dev.platform || 'Unknown'}</div></div>
                                             <div><div class="label">🌍 Language</div><div class="value">${dev.language || 'Unknown'}</div></div>
@@ -260,7 +328,6 @@
             }
         }
 
-        // Auto-refresh every 30 seconds
         setInterval(() => {
             if (document.getElementById('dashboard').style.display !== 'none') {
                 loadSuperData();
