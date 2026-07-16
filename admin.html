@@ -115,11 +115,12 @@
         .visitor-time { color: #888; font-size: 14px; }
         .visitor-details {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 10px;
         }
         .visitor-details .label { color: #888; font-size: 12px; }
         .visitor-details .value { font-size: 14px; font-weight: 500; margin-top: 3px; }
+        .visitor-details .address { font-size: 13px; color: #555; }
         .empty-state { text-align: center; padding: 60px 20px; color: #888; }
         .toggle-forms { text-align: center; margin-top: 15px; }
         .toggle-forms span { color: #667eea; cursor: pointer; text-decoration: underline; }
@@ -192,7 +193,6 @@
         let token = localStorage.getItem('adminToken');
 
         if (token) {
-            // Auto-login with token
             const user = localStorage.getItem('adminUser');
             if (user) {
                 currentUser = user;
@@ -319,13 +319,15 @@
                 container.innerHTML = data.visitors.map((v, i) => {
                     const loc = v.location || {};
                     const dev = v.device || {};
+                    const address = loc.address || 'Unknown';
                     return `<div class="visitor-entry">
                         <div class="visitor-header">
                             <strong>Visitor #${i+1}</strong>
                             <span class="visitor-time">${new Date(v.timestamp).toLocaleString()}</span>
                         </div>
                         <div class="visitor-details">
-                            <div><div class="label">📍 Location</div><div class="value">${loc.lat ? loc.lat.toFixed(4)+', '+loc.lon.toFixed(4) : 'Unknown'}</div></div>
+                            <div><div class="label">📍 Location</div><div class="value address">${address}</div></div>
+                            <div><div class="label">🌐 Coordinates</div><div class="value">${loc.lat ? loc.lat.toFixed(4)+', '+loc.lon.toFixed(4) : 'Unknown'}</div></div>
                             <div><div class="label">🌐 IP</div><div class="value">${v.ip || 'Unknown'}</div></div>
                             <div><div class="label">📱 Device</div><div class="value">${dev.platform || 'Unknown'}</div></div>
                             <div><div class="label">🌍 Language</div><div class="value">${dev.language || 'Unknown'}</div></div>
